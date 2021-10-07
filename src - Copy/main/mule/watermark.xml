@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="67e0c9f0-c015-43d9-a14c-71ec72987923" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="2eac1595-8b46-4d84-a5b0-9129dc671514" >
+		<db:my-sql-connection host="localhost" port="3306" user="root" password="Aswini08@" database="aswini" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c005a443-3387-40fb-b7f4-04300d3fa7b6" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="watermarkFlow" doc:id="2acf3ef2-5c1f-41e9-b9cf-175c158dd3bd" >
+		<scheduler doc:name="Scheduler" doc:id="17c97ac0-58b9-410a-9abe-12244b8456f5" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="1" timeUnit="HOURS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="b593ca7a-6caf-41ca-b984-6ec1ef67df4e" key="maxEmpId" objectStore="Object_store" target="watermark1">
+			<os:default-value ><![CDATA[#[0]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="5e3035a1-39b8-4717-998c-96161d8150d9" message="fetching records from id:#[vars.watermark1]"/>
+		<db:select doc:name="Select" doc:id="d4f2105f-1fea-42c8-b7d8-30be86dfda33" config-ref="Database_Config">
+			<db:sql ><![CDATA[select * from mule where empid>:empid]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	empid:vars.watermark1
+}]]]></db:input-parameters>
+		</db:select>
+		<logger level="INFO" doc:name="Logger" doc:id="8fa0a8d8-97ed-45aa-ac30-ea883b381b28" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]"/>
+		<os:store doc:name="Store" doc:id="a97d6695-92cf-47e8-8b79-98538f334a07" key="maxEmpId" objectStore="Object_store" failOnNullValue="false">
+			<os:value ><![CDATA[#[max(payload map $.empid)]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Logger" doc:id="59c44dc9-e6a6-4f38-a4ad-213994caced2" message='#["end of obj"]'/>
+	</flow>
+	<flow name="watermarkFlow1" doc:id="508a406d-582a-4602-b24f-b4da5c661c2d" >
+		<http:listener doc:name="Listener" doc:id="0f883e0e-3551-48a4-a959-c1cefa8014d0" config-ref="HTTP_Listener_config" path="/updateObj"/>
+		<os:store doc:name="Store" doc:id="6b166050-afb1-44c1-a89e-eb15a7742601" key="maxEmpId" objectStore="Object_store">
+			<os:value ><![CDATA[#[attributes.queryParams.empid]]]></os:value>
+		</os:store>
+	</flow>
+</mule>
